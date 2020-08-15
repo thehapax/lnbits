@@ -17,6 +17,7 @@ def lnurlwallet():
     memo = "LNbits LNURL funding"
 
     try:
+        print(request.args.get("lightning"))
         withdraw_res = handle_lnurl(request.args.get("lightning"))
         if not withdraw_res.ok:
             abort(HTTPStatus.BAD_REQUEST, f"Could not process LNURL-withdraw: {withdraw_res.error_msg}")
