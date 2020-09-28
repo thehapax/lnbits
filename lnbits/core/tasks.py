@@ -12,13 +12,13 @@ from .crud import get_standalone_payment
 invoice_listeners: List[Tuple[str, Callable[[Payment], Awaitable[None]]]] = []
 
 
-def register_invoice_listener(ext_name: str, callback: Callable[[Payment], Awaitable[None]]):
+def register_invoice_listener(ext_name: str, cb: Callable[[Payment], Awaitable[None]]):
     """
     A method intended for extensions to call when they want to be notified about
     new invoice payments incoming.
     """
-    print("registering callback", callback)
-    invoice_listeners.append((ext_name, callback))
+    print(f"registering {ext_name} invoice_listener callback: {cb}")
+    invoice_listeners.append((ext_name, cb))
 
 
 async def webhook_handler():
@@ -41,11 +41,11 @@ async def invoice_listener(app):
     async for checking_id in WALLET.paid_invoices_stream():
         async with app.request_context(fakerequest):
             # do this just so the g object is available
-            g.db = await open_db()
-            payment = await get_standalone_payment(checking_id)
+            g.db = open_db()
+            payment = get_standalone_payment(checking_id)
             if payment.is_in:
-                await payment.set_pending(False)
+                payment.set_pending(False)
                 loop = asyncio.get_event_loop()
                 for ext_name, cb in invoice_listeners:
-                    g.ext_db = await open_ext_db(ext_name)
+                    g.ext_db = open_ext_db(ext_name)
                     loop.create_task(cb(payment))
