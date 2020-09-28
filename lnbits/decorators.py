@@ -14,7 +14,7 @@ def api_check_wallet_key(key_type: str = "invoice"):
         @wraps(view)
         async def wrapped_view(**kwargs):
             try:
-                g.wallet = get_wallet_for_key(request.headers["X-Api-Key"], key_type)
+                g.wallet = await get_wallet_for_key(request.headers["X-Api-Key"], key_type)
             except KeyError:
                 return (
                     jsonify({"message": "`X-Api-Key` header missing."}),
@@ -62,7 +62,9 @@ def check_user_exists(param: str = "usr"):
     def wrap(view):
         @wraps(view)
         async def wrapped_view(**kwargs):
-            g.user = get_user(request.args.get(param, type=str)) or abort(HTTPStatus.NOT_FOUND, "User  does not exist.")
+            g.user = await get_user(request.args.get(param, type=str))
+            if not g.user:
+                abort(HTTPStatus.NOT_FOUND, "User  does not exist.")
 
             if LNBITS_ALLOWED_USERS and g.user.id not in LNBITS_ALLOWED_USERS:
                 abort(HTTPStatus.UNAUTHORIZED, "User not authorized.")

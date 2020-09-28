@@ -16,11 +16,11 @@ async def index():
 
 @lnurlp_ext.route("/<link_id>")
 async def display(link_id):
-    link = get_pay_link(link_id) or abort(HTTPStatus.NOT_FOUND, "Pay link does not exist.")
+    link = await get_pay_link(link_id) or abort(HTTPStatus.NOT_FOUND, "Pay link does not exist.")
     return await render_template("lnurlp/display.html", link=link)
 
 
 @lnurlp_ext.route("/print/<link_id>")
 async def print_qr(link_id):
-    link = get_pay_link(link_id) or abort(HTTPStatus.NOT_FOUND, "Pay link does not exist.")
+    link = await get_pay_link(link_id) or abort(HTTPStatus.NOT_FOUND, "Pay link does not exist.")
     return await render_template("lnurlp/print_qr.html", link=link)

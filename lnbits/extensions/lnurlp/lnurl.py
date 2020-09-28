@@ -12,7 +12,7 @@ from .crud import increment_pay_link, save_link_invoice
 
 @lnurlp_ext.route("/api/v1/lnurl/<link_id>", methods=["GET"])
 async def api_lnurl_response(link_id):
-    link = increment_pay_link(link_id, served_meta=1)
+    link = await increment_pay_link(link_id, served_meta=1)
     if not link:
         return jsonify({"status": "ERROR", "reason": "LNURL-pay not found."}), HTTPStatus.OK
 
@@ -30,7 +30,7 @@ async def api_lnurl_response(link_id):
 
 @lnurlp_ext.route("/api/v1/lnurl/cb/<link_id>", methods=["GET"])
 async def api_lnurl_callback(link_id):
-    link = increment_pay_link(link_id, served_pr=1)
+    link = await increment_pay_link(link_id, served_pr=1)
     if not link:
         return jsonify({"status": "ERROR", "reason": "LNURL-pay not found."}), HTTPStatus.OK
 

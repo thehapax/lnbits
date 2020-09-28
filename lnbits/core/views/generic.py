@@ -36,11 +36,11 @@ async def extensions():
         abort(HTTPStatus.BAD_REQUEST, "You can either `enable` or `disable` an extension.")
 
     if extension_to_enable:
-        update_user_extension(user_id=g.user.id, extension=extension_to_enable, active=1)
+        await update_user_extension(user_id=g.user.id, extension=extension_to_enable, active=1)
     elif extension_to_disable:
-        update_user_extension(user_id=g.user.id, extension=extension_to_disable, active=0)
+        await update_user_extension(user_id=g.user.id, extension=extension_to_disable, active=0)
 
-    return await render_template("core/extensions.html", user=get_user(g.user.id))
+    return await render_template("core/extensions.html", user=g.user)
 
 
 @core_app.route("/wallet")
@@ -58,9 +58,12 @@ async def wallet():
     # nothing: create everything
 
     if not user_id:
-        user = get_user(create_account().id)
+        account = await create_account()
+        user = await get_user(account.id)
     else:
-        user = get_user(user_id) or abort(HTTPStatus.NOT_FOUND, "User does not exist.")
+        user = await get_user(user_id)
+        if not user:
+            abort(HTTPStatus.NOT_FOUND, "User does not exist.")
 
         if LNBITS_ALLOWED_USERS and user_id not in LNBITS_ALLOWED_USERS:
             abort(HTTPStatus.UNAUTHORIZED, "User not authorized.")
@@ -69,7 +72,7 @@ async def wallet():
         if user.wallets and not wallet_name:
             wallet = user.wallets[0]
         else:
-            wallet = create_wallet(user_id=user.id, wallet_name=wallet_name)
+            wallet = await create_wallet(user_id=user.id, wallet_name=wallet_name)
 
         return redirect(url_for("core.wallet", usr=user.id, wal=wallet.id))
 
@@ -91,7 +94,7 @@ async def deletewallet():
     if wallet_id not in user_wallet_ids:
         abort(HTTPStatus.FORBIDDEN, "Not your wallet.")
     else:
-        delete_wallet(user_id=g.user.id, wallet_id=wallet_id)
+        await delete_wallet(user_id=g.user.id, wallet_id=wallet_id)
         user_wallet_ids.remove(wallet_id)
 
     if user_wallet_ids:

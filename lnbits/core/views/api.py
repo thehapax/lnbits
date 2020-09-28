@@ -13,12 +13,12 @@ from lnbits.decorators import api_check_wallet_key, api_validate_post_request
 @api_check_wallet_key("invoice")
 async def api_payments():
     if "check_pending" in request.args:
-        delete_expired_invoices()
+        await delete_expired_invoices()
 
-        for payment in g.wallet.get_payments(complete=False, pending=True, exclude_uncheckable=True):
-            payment.check_pending()
+        for payment in await g.wallet.get_payments(complete=False, pending=True, exclude_uncheckable=True):
+            await payment.check_pending()
 
-    return jsonify(g.wallet.get_payments()), HTTPStatus.OK
+    return jsonify(await g.wallet.get_payments()), HTTPStatus.OK
 
 
 @api_check_wallet_key("invoice")
@@ -38,11 +38,11 @@ async def api_payments_create_invoice():
         memo = g.data["memo"]
 
     try:
-        payment_hash, payment_request = create_invoice(
+        payment_hash, payment_request = await create_invoice(
             wallet_id=g.wallet.id, amount=g.data["amount"], memo=memo, description_hash=description_hash
         )
     except Exception as e:
-        g.db.rollback()
+        await g.db.rollback()
         return jsonify({"message": str(e)}), HTTPStatus.INTERNAL_SERVER_ERROR
 
     invoice = bolt11.decode(payment_request)
@@ -63,14 +63,14 @@ async def api_payments_create_invoice():
 @api_validate_post_request(schema={"bolt11": {"type": "string", "empty": False, "required": True}})
 async def api_payments_pay_invoice():
     try:
-        payment_hash = pay_invoice(wallet_id=g.wallet.id, payment_request=g.data["bolt11"])
+        payment_hash = await pay_invoice(wallet_id=g.wallet.id, payment_request=g.data["bolt11"])
     except ValueError as e:
         return jsonify({"message": str(e)}), HTTPStatus.BAD_REQUEST
     except PermissionError as e:
         return jsonify({"message": str(e)}), HTTPStatus.FORBIDDEN
     except Exception as e:
         print(e)
-        g.db.rollback()
+        await g.db.rollback()
         return jsonify({"message": str(e)}), HTTPStatus.INTERNAL_SERVER_ERROR
 
     return (
@@ -96,7 +96,7 @@ async def api_payments_create():
 @core_app.route("/api/v1/payments/<payment_hash>", methods=["GET"])
 @api_check_wallet_key("invoice")
 async def api_payment(payment_hash):
-    payment = g.wallet.get_payment(payment_hash)
+    payment = await g.wallet.get_payment(payment_hash)
 
     if not payment:
         return jsonify({"message": "Payment does not exist."}), HTTPStatus.NOT_FOUND
@@ -104,7 +104,7 @@ async def api_payment(payment_hash):
         return jsonify({"paid": True}), HTTPStatus.OK
 
     try:
-        payment.check_pending()
+        await payment.check_pending()
     except Exception:
         return jsonify({"paid": False}), HTTPStatus.OK
 

@@ -51,9 +51,9 @@ async def lnurlwallet():
             continue
         break
 
-    user = get_user(create_account().id)
-    wallet = create_wallet(user_id=user.id)
-    create_payment(
+    user = await get_user(await create_account().id)
+    wallet = await create_wallet(user_id=user.id)
+    await create_payment(
         wallet_id=wallet.id,
         checking_id=checking_id,
         amount=withdraw_res.max_sats * 1000,
