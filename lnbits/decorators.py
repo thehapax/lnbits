@@ -81,17 +81,17 @@ def validate_uuids(params: List[str], *, required: Union[bool, List[str]] = Fals
     def wrap(view):
         @wraps(view)
         async def wrapped_view(**kwargs):
-            query_params = {param: request.args.get(param, type=str) for param in params}
+            for param in params:
+                value = request.args.get(param, type=str)
+                if not value:
+                    if required is True or (required and param in required):
+                        abort(HTTPStatus.BAD_REQUEST, f"`{param}` is required.")
+                    continue
 
-            for param, value in query_params.items():
-                if not value and (required is True or (required and param in required)):
-                    abort(HTTPStatus.BAD_REQUEST, f"`{param}` is required.")
-
-                if value:
-                    try:
-                        UUID(value, version=version)
-                    except ValueError:
-                        abort(HTTPStatus.BAD_REQUEST, f"`{param}` is not a valid UUID.")
+                try:
+                    UUID(value, version=version)
+                except ValueError:
+                    abort(HTTPStatus.BAD_REQUEST, f"`{param}` is not a valid UUID.")
 
             return await view(**kwargs)
 

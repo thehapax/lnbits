@@ -298,9 +298,9 @@ async def delete_payment(checking_id: str) -> None:
 async def check_internal(payment_hash: str) -> Optional[str]:
     row = await db.fetchone(
         """
-    SELECT checking_id FROM apipayments
-    WHERE hash = ? AND pending AND amount > 0 
-    """,
+        SELECT checking_id FROM apipayments
+        WHERE hash = ? AND pending AND amount > 0 
+        """,
         (payment_hash,),
     )
     if not row:
