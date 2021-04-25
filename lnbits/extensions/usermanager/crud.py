@@ -4,7 +4,7 @@ from lnbits.core.models import Payment
 from lnbits.core.crud import (
     create_account,
     get_user,
-    get_wallet_payments,
+    get_payments,
     create_wallet,
     delete_wallet,
 )
@@ -16,7 +16,9 @@ from .models import Users, Wallets
 ### Users
 
 
-async def create_usermanager_user(user_name: str, wallet_name: str, admin_id: str) -> Users:
+async def create_usermanager_user(
+    user_name: str, wallet_name: str, admin_id: str
+) -> Users:
     account = await create_account()
     user = await get_user(account.id)
     assert user, "Newly created user couldn't be retrieved"
@@ -66,7 +68,9 @@ async def delete_usermanager_user(user_id: str) -> None:
 ### Wallets
 
 
-async def create_usermanager_wallet(user_id: str, wallet_name: str, admin_id: str) -> Wallets:
+async def create_usermanager_wallet(
+    user_id: str, wallet_name: str, admin_id: str
+) -> Wallets:
     wallet = await create_wallet(user_id=user_id, wallet_name=wallet_name)
     await db.execute(
         """
@@ -85,13 +89,20 @@ async def get_usermanager_wallet(wallet_id: str) -> Optional[Wallets]:
     return Wallets(**row) if row else None
 
 
-async def get_usermanager_wallets(user_id: str) -> List[Wallets]:
-    rows = await db.fetchall("SELECT * FROM wallets WHERE admin = ?", (user_id,))
+async def get_usermanager_wallets(admin_id: str) -> Optional[Wallets]:
+    rows = await db.fetchall("SELECT * FROM wallets WHERE admin = ?", (admin_id,))
     return [Wallets(**row) for row in rows]
 
 
-async def get_usermanager_wallet_transactions(wallet_id: str) -> List[Payment]:
-    return await get_wallet_payments(wallet_id=wallet_id, complete=True, pending=False, outgoing=True, incoming=True)
+async def get_usermanager_users_wallets(user_id: str) -> Optional[Wallets]:
+    rows = await db.fetchall("SELECT * FROM wallets WHERE user = ?", (user_id,))
+    return [Wallets(**row) for row in rows]
+
+
+async def get_usermanager_wallet_transactions(wallet_id: str) -> Optional[Payment]:
+    return await get_payments(
+        wallet_id=wallet_id, complete=True, pending=False, outgoing=True, incoming=True
+    )
 
 
 async def delete_usermanager_wallet(wallet_id: str, user_id: str) -> None:

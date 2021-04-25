@@ -52,13 +52,8 @@ window.LNbits = {
     getWallet: function (wallet) {
       return this.request('get', '/api/v1/wallet', wallet.inkey)
     },
-    getPayments: function (wallet, checkPending) {
-      var query_param = checkPending ? '?check_pending' : ''
-      return this.request(
-        'get',
-        ['/api/v1/payments', query_param].join(''),
-        wallet.inkey
-      )
+    getPayments: function (wallet) {
+      return this.request('get', '/api/v1/payments', wallet.inkey)
     },
     getPayment: function (wallet, paymentHash) {
       return this.request(
@@ -70,15 +65,37 @@ window.LNbits = {
   },
   events: {
     onInvoicePaid: function (wallet, cb) {
-      if (!this.pis) {
-        this.pis = new EventSource(
+      let listener = ev => {
+        cb(JSON.parse(ev.data))
+      }
+
+      this.listenersCount = this.listenersCount || {[wallet.inkey]: 0}
+      this.listenersCount[wallet.inkey]++
+
+      this.listeners = this.listeners || {}
+      if (!(wallet.inkey in this.listeners)) {
+        this.listeners[wallet.inkey] = new EventSource(
           '/api/v1/payments/sse?api-key=' + wallet.inkey
         )
       }
 
-      this.pis.addEventListener('payment-received', ev =>
-        cb(JSON.parse(ev.data))
+      this.listeners[wallet.inkey].addEventListener(
+        'payment-received',
+        listener
       )
+
+      return () => {
+        this.listeners[wallet.inkey].removeEventListener(
+          'payment-received',
+          listener
+        )
+        this.listenersCount[wallet.inkey]--
+
+        if (this.listenersCount[wallet.inkey] <= 0) {
+          this.listeners[wallet.inkey].close()
+          delete this.listeners[wallet.inkey]
+        }
+      }
     }
   },
   href: {
@@ -93,7 +110,15 @@ window.LNbits = {
   map: {
     extension: function (data) {
       var obj = _.object(
-        ['code', 'isValid', 'name', 'shortDescription', 'icon'],
+        [
+          'code',
+          'isValid',
+          'name',
+          'shortDescription',
+          'icon',
+          'contributors',
+          'hidden'
+        ],
         data
       )
       obj.url = ['/', obj.code, '/'].join('')
@@ -308,6 +333,9 @@ window.windowMixin = {
         window.extensions
           .map(function (data) {
             return window.LNbits.map.extension(data)
+          })
+          .filter(function (obj) {
+            return !obj.hidden
           })
           .map(function (obj) {
             if (user) {

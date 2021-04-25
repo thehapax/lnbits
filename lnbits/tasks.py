@@ -1,10 +1,17 @@
+import time
 import trio  # type: ignore
 from http import HTTPStatus
 from typing import Optional, List, Callable
 from quart_trio import QuartTrio
 
 from lnbits.settings import WALLET
-from lnbits.core.crud import get_standalone_payment
+from lnbits.core.crud import (
+    get_payments,
+    get_standalone_payment,
+    delete_expired_invoices,
+    get_balance_checks,
+)
+from lnbits.core.services import redeem_lnurl_withdraw
 
 main_app: Optional[QuartTrio] = None
 
@@ -54,16 +61,46 @@ async def webhook_handler():
 internal_invoice_paid, internal_invoice_received = trio.open_memory_channel(0)
 
 
-async def internal_invoice_listener():
-    async with trio.open_nursery() as nursery:
-        async for checking_id in internal_invoice_received:
-            nursery.start_soon(invoice_callback_dispatcher, checking_id)
+async def internal_invoice_listener(nursery):
+    async for checking_id in internal_invoice_received:
+        nursery.start_soon(invoice_callback_dispatcher, checking_id)
 
 
-async def invoice_listener():
-    async with trio.open_nursery() as nursery:
-        async for checking_id in WALLET.paid_invoices_stream():
-            nursery.start_soon(invoice_callback_dispatcher, checking_id)
+async def invoice_listener(nursery):
+    async for checking_id in WALLET.paid_invoices_stream():
+        nursery.start_soon(invoice_callback_dispatcher, checking_id)
+
+
+async def check_pending_payments():
+    await delete_expired_invoices()
+
+    outgoing = True
+    incoming = True
+
+    while True:
+        for payment in await get_payments(
+            since=(int(time.time()) - 60 * 60 * 24 * 15),  # 15 days ago
+            complete=False,
+            pending=True,
+            outgoing=outgoing,
+            incoming=incoming,
+            exclude_uncheckable=True,
+        ):
+            await payment.check_pending()
+
+        # after the first check we will only check outgoing, not incoming
+        # that will be handled by the global invoice listeners, hopefully
+        incoming = False
+
+        await trio.sleep(60 * 30)  # every 30 minutes
+
+
+async def perform_balance_checks():
+    while True:
+        for bc in await get_balance_checks():
+            redeem_lnurl_withdraw(bc.wallet, bc.url)
+
+        await trio.sleep(60 * 60 * 6)  # every 6 hours
 
 
 async def invoice_callback_dispatcher(checking_id: str):

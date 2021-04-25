@@ -4,6 +4,7 @@
 <!---->
 {% block scripts %} {{ window_vars(user, wallet) }}
 <script src="/core/static/js/wallet.js"></script>
+<link rel="manifest" href="/manifest/{{ user.id }}.webmanifest" />
 {% endblock %}
 <!---->
 {% block title %} {{ wallet.name }} - {{ SITE_TITLE }} {% endblock %}
@@ -87,9 +88,10 @@
           dense
           flat
           :data="filteredPayments"
-          row-key="payment_hash"
+          :row-key="paymentTableRowKey"
           :columns="paymentsTable.columns"
           :pagination.sync="paymentsTable.pagination"
+          no-data-label="No transactions made yet"
         >
           {% raw %}
           <template v-slot:header="props">
@@ -219,19 +221,60 @@
   <div class="col-12 col-md-5 q-gutter-y-md">
     <q-card>
       <q-card-section>
-        <q-btn flat color="grey" @click="exportCSV" class="float-right"
-          >Renew keys</q-btn
-        >
-        <h6 class="text-subtitle1 q-mt-none q-mb-sm">LNbits wallet</h6>
-        <strong>Wallet name: </strong><em>{{ wallet.name }}</em><br />
-        <strong>Wallet ID: </strong><em>{{ wallet.id }}</em><br />
-        <strong>Admin key: </strong><em>{{ wallet.adminkey }}</em><br />
-        <strong>Invoice/read key: </strong><em>{{ wallet.inkey }}</em>
+        <h6 class="text-subtitle1 q-mt-none q-mb-sm">
+          LNbits wallet: <strong><em>{{ wallet.name }}</em></strong>
+        </h6>
       </q-card-section>
       <q-card-section class="q-pa-none">
         <q-separator></q-separator>
+
         <q-list>
           {% include "core/_api_docs.html" %}
+          <q-separator></q-separator>
+
+          {% if wallet.lnurlwithdraw_full %}
+          <q-expansion-item group="extras" icon="crop_free" label="Drain Funds">
+            <q-card>
+              <q-card-section class="text-center">
+                <p>
+                  This is an LNURL-withdraw QR code for slurping everything from
+                  this wallet. Do not share with anyone.
+                </p>
+                <a href="lightning:{{wallet.lnurlwithdraw_full}}">
+                  <qrcode
+                    value="{{wallet.lnurlwithdraw_full}}"
+                    :options="{width:240}"
+                  ></qrcode>
+                </a>
+                <p>
+                  It is compatible with <code>balanceCheck</code> and
+                  <code>balanceNotify</code> so your wallet may keep pulling the
+                  funds continuously from here after the first withdraw.
+                </p>
+              </q-card-section>
+            </q-card>
+          </q-expansion-item>
+          <q-separator></q-separator>
+          {% endif %}
+
+          <q-expansion-item
+            group="extras"
+            icon="settings_cell"
+            label="Export to Phone with QR Code"
+          >
+            <q-card>
+              <q-card-section class="text-center">
+                <p>
+                  This QR code contains your wallet URL with full access. You
+                  can scan it from your phone to open your wallet from there.
+                </p>
+                <qrcode
+                  :value="'{{request.url_root}}'+'wallet?usr={{user.id}}&wal={{wallet.id}}'"
+                  :options="{width:240}"
+                ></qrcode>
+              </q-card-section>
+            </q-card>
+          </q-expansion-item>
           <q-separator></q-separator>
           <q-expansion-item
             group="extras"
@@ -291,7 +334,7 @@
         <q-btn
           unelevated
           color="deep-purple"
-          :disable="receive.data.amount == null || receive.data.amount <= 0"
+          :disable="receive.data.memo == null || receive.data.amount == null || receive.data.amount <= 0"
           type="submit"
         >
           <span v-if="receive.lnurl">
@@ -425,7 +468,7 @@
             <q-input
               filled
               dense
-              v-model.number="parse.data.comment"
+              v-model="parse.data.comment"
               :type="parse.lnurlpay.commentAllowed > 64 ? 'textarea' : 'text'"
               label="Comment (optional)"
               :maxlength="parse.lnurlpay.commentAllowed"
